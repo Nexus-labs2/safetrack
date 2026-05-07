@@ -8,7 +8,8 @@ const { createClient } = require('@supabase/supabase-js');
 const fetch = require('node-fetch');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const turf = require('@turf/turf');
+const booleanPointInPolygon = require('@turf/boolean-point-in-polygon').default;
+const { point, polygon } = require('@turf/helpers');
 
 const app = express();
 const server = http.createServer(app);
@@ -146,26 +147,36 @@ async function checkGeofences(deviceId, lat, lng) {
 
   if (!fences || fences.length === 0) return;
 
-  const point = turf.point([lng, lat]);
+  const pt = point([lng, lat]);
 
   for (const fence of fences) {
-    const polygon = turf.polygon(fence.zone.coordinates);
-    const inside = turf.booleanPointInPolygon(point, polygon);
+    try {
+      // Handle both Polygon and Circle-style zones
+      if (!fence.zone || !fence.zone.coordinates) continue;
 
-    if (!inside) {
-      // Child is outside zone — save breach and notify
-      await supabase.from('geofence_breaches').insert({
-        device_id: deviceId, geofence_id: fence.id,
-        lat, lng, breach_type: 'exit'
-      });
+      const poly = polygon(fence.zone.coordinates);
+      const inside = booleanPointInPolygon(pt, poly);
 
-      io.emit('geofence_breach', {
-        deviceId, fenceName: fence.name,
-        lat, lng, time: new Date().toISOString(),
-        message: `⚠️ ${deviceId} left safe zone "${fence.name}"!`
-      });
+      if (!inside) {
+        await supabase.from('geofence_breaches').insert({
+          device_id: deviceId,
+          geofence_id: fence.id,
+          lat, lng,
+          breach_type: 'exit'
+        });
 
-      console.log(`🚨 GEOFENCE BREACH: ${deviceId} left "${fence.name}"`);
+        io.emit('geofence_breach', {
+          deviceId,
+          fenceName: fence.name,
+          lat, lng,
+          time: new Date().toISOString(),
+          message: `⚠️ ${deviceId} left safe zone "${fence.name}"!`
+        });
+
+        console.log(`🚨 GEOFENCE BREACH: ${deviceId} left "${fence.name}"`);
+      }
+    } catch (err) {
+      console.error(`Geofence check error for fence ${fence.id}:`, err.message);
     }
   }
 }
