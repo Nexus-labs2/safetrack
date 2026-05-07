@@ -28,9 +28,13 @@ const supabase = createClient(
 
 // ── CORS ──────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
+
   'http://localhost:3000',
-  'https://safetrack-frontend1.onrender.com',
+
+  'https://safetrack-frontend2.onrender.com',
+
   /\.onrender\.com$/
+
 ];
 
 const io = new Server(server, {
