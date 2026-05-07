@@ -1,4 +1,5 @@
 require('dotenv').config();
+const ws = require('ws');  // ← ADD THIS LINE
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -17,7 +18,12 @@ const server = http.createServer(app);
 // ── Supabase ──────────────────────────────────────────────
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_KEY,
+  {
+    realtime: {
+      transport: ws
+    }
+  }
 );
 
 // ── CORS ──────────────────────────────────────────────────
